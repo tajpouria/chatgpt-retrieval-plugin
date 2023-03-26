@@ -11,11 +11,11 @@ import pptx
 from models.models import Document, DocumentMetadata
 
 
-async def get_document_from_file(file: UploadFile) -> Document:
+async def get_document_from_file(
+    file: UploadFile, metadata: DocumentMetadata
+) -> Document:
     extracted_text = await extract_text_from_form_file(file)
     print(f"extracted_text:")
-    # get metadata
-    metadata = DocumentMetadata()
     doc = Document(text=extracted_text, metadata=metadata)
 
     return doc

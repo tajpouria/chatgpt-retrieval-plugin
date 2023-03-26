@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 import uvicorn
 from fastapi import FastAPI, File, HTTPException, Depends, Body, UploadFile
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -14,6 +15,7 @@ from models.api import (
 )
 from datastore.factory import get_datastore
 from services.file import get_document_from_file
+from models.models import DocumentMetadata
 
 
 app = FastAPI()
@@ -40,14 +42,21 @@ def validate_token(credentials: HTTPAuthorizationCredentials = Depends(bearer_sc
 
 
 @app.post(
-    "/upsert-file",
+    "/upsert-file/{author}",
     response_model=UpsertResponse,
 )
 async def upsert_file(
+    author: str,
     file: UploadFile = File(...),
     token: HTTPAuthorizationCredentials = Depends(validate_token),
 ):
-    document = await get_document_from_file(file)
+    metadata = DocumentMetadata(
+        author=author,
+    )
+    document = await get_document_from_file(
+        file=file,
+        metadata=metadata,
+    )
 
     try:
         ids = await datastore.upsert([document])
