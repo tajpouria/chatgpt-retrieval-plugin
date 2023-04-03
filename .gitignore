@@ -139,3 +139,6 @@ dmypy.json
 
 # Envirnoment variables
 run.fish
+
+# Sreamlit
+.streamlit
