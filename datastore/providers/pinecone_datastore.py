@@ -95,9 +95,16 @@ class PineconeDataStore(DataStore):
         ]
         # Upsert each batch to Pinecone
         for batch in batches:
+            namespace = batch[0][2]["namespace"] if "namespace" in batch[0][2] else None
             try:
-                print(f"Upserting batch of size {len(batch)}")
-                self.index.upsert(vectors=batch)
+                print(
+                    f"Upserting batch of size {len(batch)} to namespace {namespace if namespace else 'default'}"
+                )
+                self.index.upsert(
+                    vectors=batch
+                ) if namespace == None else self.index.upsert(
+                    vectors=batch, namespace=namespace
+                )
                 print(f"Upserted batch successfully")
             except Exception as e:
                 print(f"Error upserting batch: {e}")

@@ -1,8 +1,19 @@
 import os
+from pydantic import ValidationError
 import uvicorn
-from fastapi import FastAPI, File, HTTPException, Depends, Body, UploadFile
+from fastapi import (
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Depends,
+    Body,
+    UploadFile,
+    status,
+)
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
+from fastapi.encoders import jsonable_encoder
 
 from models.api import (
     DeleteRequest,
@@ -12,9 +23,9 @@ from models.api import (
     UpsertRequest,
     UpsertResponse,
 )
+from models.models import DocumentMetadata
 from datastore.factory import get_datastore
 from services.file import get_document_from_file
-from models.models import DocumentMetadata
 
 
 app = FastAPI()
@@ -40,22 +51,38 @@ def validate_token(credentials: HTTPAuthorizationCredentials = Depends(bearer_sc
     return credentials
 
 
+def upsert_file_metadata_parser(metadata: str = Form(...)):
+    try:
+        model = DocumentMetadata.parse_raw(metadata)
+    except ValidationError as e:
+        raise HTTPException(
+            detail=jsonable_encoder(e.errors()),
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+
+    return model
+
+
 @app.post(
-    "/upsert-file/{author}",
+    "/upsert-file",
     response_model=UpsertResponse,
 )
 async def upsert_file(
-    author: str,
+    metadata: DocumentMetadata = Depends(upsert_file_metadata_parser),
     file: UploadFile = File(...),
     token: HTTPAuthorizationCredentials = Depends(validate_token),
 ):
-    metadata = DocumentMetadata(
-        author=author,
-    )
-    document = await get_document_from_file(
-        file=file,
-        metadata=metadata,
-    )
+    """Upload a file and metadata to the datastore.
+
+    Args:
+        metadata (DocumentMetadata): The metadata for the file.
+        file (UploadFile): The file to upload.
+        token (HTTPAuthorizationCredentials): The token to authenticate the request.
+
+    Returns:
+        UpsertResponse: The response containing the ids of the documents that were upserted.
+    """
+    document = await get_document_from_file(file=file, metadata=metadata)
 
     try:
         ids = await datastore.upsert([document])
