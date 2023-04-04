@@ -24,7 +24,7 @@ from models.api import (
     UpsertResponse,
 )
 from models.models import DocumentMetadata
-from datastore.factory import get_datastore
+from datastore.factory import datastore
 from services.file import get_document_from_file
 from bot.router import router_v1
 
@@ -37,7 +37,7 @@ sub_app = FastAPI(
     title="Retrieval Plugin API",
     description="A retrieval API for querying and filtering documents based on natural language queries and metadata",
     version="1.0.0",
-    servers=[{"url": "https://your-app-url.com"}],
+    servers=[{"url": "https://tajpouria.com"}],
 )
 app.mount("/sub", sub_app)
 
@@ -173,12 +173,6 @@ async def delete(
 
 
 app.include_router(router_v1, prefix="/api/v1/bot", tags=["bot"])
-
-
-@app.on_event("startup")
-async def startup():
-    global datastore
-    datastore = await get_datastore()
 
 
 def start():

@@ -123,7 +123,7 @@ class PineconeDataStore(DataStore):
 
         # Define a helper coroutine that performs a single query and returns a QueryResult
         async def _single_query(query: QueryWithEmbedding) -> QueryResult:
-            print(f"Query: {query.query}")
+            print(f"Query: {query.query}, Namespace: {query.namespace}")
 
             # Convert the metadata filter object to a dict with pinecone filter expressions
             pinecone_filter = self._get_pinecone_filter(query.filter)
@@ -131,11 +131,11 @@ class PineconeDataStore(DataStore):
             try:
                 # Query the index with the query embedding, filter, and top_k
                 query_response = self.index.query(
-                    # namespace=namespace,
                     top_k=query.top_k,
                     vector=query.embedding,
                     filter=pinecone_filter,
                     include_metadata=True,
+                    namespace=query.namespace,
                 )
             except Exception as e:
                 print(f"Error querying index: {e}")

@@ -29,7 +29,7 @@ async def handle_widget_event(agentbot_id: int, request: dict):
         process_webwidget_triggered_event(agentbot_id, request)
     elif event_type == WidgetEventType.message_created:
         # Handle the 'message_created' event
-        process_message_created_event(agentbot_id, request)
+        await process_message_created_event(agentbot_id, request)
     else:
         # Handle unknown event types
         process_unknown_event(agentbot_id, request)

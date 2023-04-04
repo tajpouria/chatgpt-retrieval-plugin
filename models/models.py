@@ -10,7 +10,8 @@ class Source(str, Enum):
 
 
 class DocumentMetadata(BaseModel):
-    namespace: str
+    account_id: Optional[int] = None
+    agentbot_id: Optional[int] = None
     source: Optional[Source] = None
     source_id: Optional[str] = None
     url: Optional[str] = None
@@ -44,6 +45,8 @@ class DocumentWithChunks(Document):
 
 
 class DocumentMetadataFilter(BaseModel):
+    account_id: Optional[int] = None
+    agentbot_id: Optional[int] = None
     document_id: Optional[str] = None
     source: Optional[Source] = None
     source_id: Optional[str] = None
@@ -54,6 +57,7 @@ class DocumentMetadataFilter(BaseModel):
 
 class Query(BaseModel):
     query: str
+    namespace: Optional[str] = None
     filter: Optional[DocumentMetadataFilter] = None
     top_k: Optional[int] = 3
 

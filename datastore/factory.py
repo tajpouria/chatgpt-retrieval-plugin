@@ -2,7 +2,28 @@ from datastore.datastore import DataStore
 import os
 
 
-async def get_datastore() -> DataStore:
+def get_namespace_name(account_id: int, agentbot_id: int) -> str:
+    """
+    Returns the namespace name for a given account and agentbot.
+
+    Args:
+        account_id: The account id.
+        agentbot_id: The agentbot id.
+
+    Returns:
+        The namespace name.
+    """
+    return f"{account_id}_{agentbot_id}"
+
+
+def get_datastore() -> DataStore:
+    """
+    Returns the datastore instance.
+
+    Returns:
+        The datastore instance.
+    """
+
     datastore = os.environ.get("DATASTORE")
     assert datastore is not None
 
@@ -26,10 +47,13 @@ async def get_datastore() -> DataStore:
         case "redis":
             from datastore.providers.redis_datastore import RedisDataStore
 
-            return await RedisDataStore.init()
+            return RedisDataStore.init()
         case "qdrant":
             from datastore.providers.qdrant_datastore import QdrantDataStore
 
             return QdrantDataStore()
         case _:
             raise ValueError(f"Unsupported vector database: {datastore}")
+
+
+datastore = get_datastore()

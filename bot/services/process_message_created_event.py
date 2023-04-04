@@ -5,7 +5,13 @@ from chatwoot.services.send_message_to_conversation import (
 from chatwoot.schemas.common import AccountSettings
 from bot.schemas.message_created import ContentType, MessageCreatedEvent
 from services.logger import logger
+from services.translate import translate_text
+from services.query_parser import concatenate_query_results
 from dict_deep import deep_get
+from datastore.factory import datastore, get_namespace_name
+from prompts.bot_conversation import prompt as bot_conversation_prompt
+from agents.llm import llm
+from models.models import Query
 
 CHATWOOT_URL = os.getenv("CHATWOOT_URL")
 CHATWOOT_BOT_TOKEN = os.getenv("CHATWOOT_BOT_TOKEN")
@@ -13,8 +19,12 @@ CHATWOOT_PLATFORM_TOKEN = os.getenv("CHATWOOT_PLATFORM_TOKEN")
 CHATWOOT_USER_TOKEN = os.getenv("CHATWOOT_USER_TOKEN")
 CHATWOOT_AGENTBOT_OUTGOING_URL = os.getenv("CHATWOOT_AGENTBOT_OUTGOING_URL")
 
+agentbot_description = "Fly With Bot is an AI-powered chatbot designed to assist customers with information on Fly With Pouria, an online travel business offering ticket selling, car renting, and hotel renting services. Available 24/7, Fly With Bot provides customers with up-to-date and accurate information on Fly With Pouria's products and services, including pricing and availability. Customers can also receive recommendations based on their preferences and previous booking history, and Fly With Bot can even assist with last-minute changes or cancellations. With its natural language processing capabilities and user-friendly interface, Fly With Bot is the perfect travel companion for anyone looking to book travel services with Fly With Pouria."
 
-def process_message_created_event(agentbot_id: int, event_data: MessageCreatedEvent):
+
+async def process_message_created_event(
+    agentbot_id: int, event_data: MessageCreatedEvent
+):
     """Handle a 'message_created' event.
 
     Args:
@@ -34,14 +44,16 @@ def process_message_created_event(agentbot_id: int, event_data: MessageCreatedEv
 
     content_type = ContentType(event_data.get("content_type"))
     if content_type == ContentType.text:
-        handle_text_content(event_data)
+        await handle_text_content(agentbot_id, event_data)
         pass
     else:
         handle_unknown_content_type(event_data)
         pass
 
 
-def handle_text_content(event_data: MessageCreatedEvent):
+async def handle_text_content(
+    agentbot_id: int, event_data: MessageCreatedEvent
+) -> None:
     """Handle text content.
 
     Args:
@@ -75,17 +87,91 @@ def handle_text_content(event_data: MessageCreatedEvent):
         chatwoot_account_id=account_id,
     )
 
+    # Get the translated query
+    # TODO: We must setup a way to get the user's knowledge base language
+    try:
+        translated_content, content_language = translate_text("en", content)
+    except Exception as e:
+        logger.error("Error translating text: %s", e)
+        # TODO: Extract the bot failure messages to a separate module with translations for each language
+        response = send_message_to_conversation(
+            conversation_id,
+            "Oops, something went wrong. Please try again later.",
+            settings=settings,
+        )
+        if response.status_code != 200:
+            logger.error(
+                "Send message to conversation failed, response body: %s", response.text
+            )
+
+        return
+
+    # Query the Datastore
+    try:
+        # TODO: Add the common namespace query as well namespace=hoory for example
+        datastore_results = await datastore.query(
+            queries=[
+                Query(
+                    query=translated_content,
+                    namespace=get_namespace_name(
+                        account_id=account_id, agentbot_id=agentbot_id
+                    ),
+                    top_k=3,
+                )
+            ]
+        )
+        query_results = concatenate_query_results(datastore_results)
+    except Exception as e:
+        logger.error("Error querying the datastore: %s", e)
+        response = send_message_to_conversation(
+            conversation_id,
+            "Oops, something went wrong. Please try again later.",
+            settings=settings,
+        )
+        if response.status_code != 200:
+            logger.error(
+                "Send message to conversation failed, response body: %s",
+                response.text,
+            )
+
+        return
+
+    # Get the LLM response
+    # TODO: Make and keep user conversation in outsource memory for a week
+    # TODO: Must be rewritten with langchain conversation flow
+    try:
+        prompt = bot_conversation_prompt.format(
+            agentbot_description=agentbot_description,
+            common_query_results="",
+            account_query_results=query_results.get("account", ""),
+            content_language=content_language,
+            conversation=content,
+        )
+        ai_content = llm(prompt)
+    except Exception as e:
+        logger.error("Error generating the response: %s", e)
+        response = send_message_to_conversation(
+            conversation_id,
+            "Oops, something went wrong. Please try again later.",
+            settings=settings,
+        )
+        if response.status_code != 200:
+            logger.error(
+                "Send message to conversation failed, response body: %s",
+                response.text,
+            )
+
+        return
+
     response = send_message_to_conversation(
         conversation_id,
-        content,
+        ai_content,
         settings=settings,
     )
-    status_code = response.status_code
-    logger.info(
-        "Send message to conversation response status: %s", response.status_code
-    )
-    if status_code != 200:
-        logger.error("Send message to conversation response body: %s", response.text)
+    if response.status_code != 200:
+        logger.error(
+            "Send message to conversation failed, response body: %s", response.text
+        )
 
 
 def handle_unknown_content_type(event_data: MessageCreatedEvent):
