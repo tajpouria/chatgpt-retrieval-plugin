@@ -26,6 +26,7 @@ from models.api import (
 from models.models import DocumentMetadata
 from datastore.factory import get_datastore
 from services.file import get_document_from_file
+from bot.router import router_v1
 
 
 app = FastAPI()
@@ -169,6 +170,9 @@ async def delete(
     except Exception as e:
         print("Error:", e)
         raise HTTPException(status_code=500, detail="Internal Service Error")
+
+
+app.include_router(router_v1, prefix="/api/v1/bot", tags=["bot"])
 
 
 @app.on_event("startup")

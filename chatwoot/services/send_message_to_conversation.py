@@ -5,7 +5,6 @@ from chatwoot.schemas.common import AccountSettings
 
 
 def send_message_to_conversation(
-    account_id: str,
     conversation_id: str,
     message: str,
     settings: AccountSettings,
@@ -23,7 +22,7 @@ def send_message_to_conversation(
         Dict[str, Any]: A dictionary containing the response from the Chatwoot API.
     """
     data = {"content": message}
-    url = f"{settings.chatwoot_url}/api/v1/accounts/{account_id}/conversations/{conversation_id}/messages"
+    url = f"{settings.chatwoot_url}/api/v1/accounts/{settings.chatwoot_account_id}/conversations/{conversation_id}/messages"
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json",
