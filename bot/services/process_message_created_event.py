@@ -14,7 +14,7 @@ CHATWOOT_USER_TOKEN = os.getenv("CHATWOOT_USER_TOKEN")
 CHATWOOT_AGENTBOT_OUTGOING_URL = os.getenv("CHATWOOT_AGENTBOT_OUTGOING_URL")
 
 
-def process_message_created_event(event_data: MessageCreatedEvent):
+def process_message_created_event(agentbot_id: int, event_data: MessageCreatedEvent):
     """Handle a 'message_created' event.
 
     Args:
@@ -23,7 +23,9 @@ def process_message_created_event(event_data: MessageCreatedEvent):
     Returns:
         None.
     """
-    logger.info("Received a 'message_created' event: %s", event_data)
+    logger.info(
+        "Agentbot %s Received a 'message_created' event: %s", agentbot_id, event_data
+    )
 
     message_type = event_data.get("message_type")
     if message_type == "outgoing":

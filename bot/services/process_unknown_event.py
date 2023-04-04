@@ -1,7 +1,7 @@
 from services.logger import logger
 
 
-def process_unknown_event(event_data: dict):
+def process_unknown_event(agentbot_id: int, event_data: dict):
     """Handle an event with an unknown type.
 
     Args:
@@ -11,5 +11,7 @@ def process_unknown_event(event_data: dict):
         None.
     """
     logger.warning(
-        "Received an event with an unknown type: %s", event_data.get("event")
+        "Agentbot %s Received an event with an unknown type: %s",
+        agentbot_id,
+        event_data.get("event"),
     )

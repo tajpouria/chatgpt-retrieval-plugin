@@ -2,7 +2,9 @@ from bot.schemas.message_created import MessageCreatedEvent
 from services.logger import logger
 
 
-def process_webwidget_triggered_event(event_data: MessageCreatedEvent):
+def process_webwidget_triggered_event(
+    agentbot_id: int, event_data: MessageCreatedEvent
+):
     """Handle a 'message_created' event.
 
     Args:
@@ -12,4 +14,8 @@ def process_webwidget_triggered_event(event_data: MessageCreatedEvent):
         None.
     """
 
-    logger.info("Received a 'webwidget_triggered' event: %s", event_data)
+    logger.info(
+        "AgentBot %s Received a 'webwidget_triggered' event: %s",
+        agentbot_id,
+        event_data,
+    )
