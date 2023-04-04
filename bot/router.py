@@ -12,8 +12,8 @@ from bot.services.process_webwidget_triggered_event import (
 router_v1 = APIRouter()
 
 
-@router_v1.post("/widget-event")
-async def handle_widget_event(request: dict):
+@router_v1.post("/{agentbot_id}/widget-event")
+async def handle_widget_event(agentbot_id: int, request: dict):
     """Handle incoming widget events.
 
     Args:
@@ -26,12 +26,12 @@ async def handle_widget_event(request: dict):
     event_type = WidgetEventType(request.get("event"))
     if event_type == WidgetEventType.webwidget_triggered:
         # Handle the 'webwidget_triggered' event
-        process_webwidget_triggered_event(request)
+        process_webwidget_triggered_event(agentbot_id, request)
     elif event_type == WidgetEventType.message_created:
         # Handle the 'message_created' event
-        process_message_created_event(request)
+        process_message_created_event(agentbot_id, request)
     else:
         # Handle unknown event types
-        process_unknown_event(request)
+        process_unknown_event(agentbot_id, request)
 
     return {"status": "success"}
