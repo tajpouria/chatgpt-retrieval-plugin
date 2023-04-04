@@ -1,5 +1,4 @@
 import os
-from typing import Optional
 import uvicorn
 from fastapi import FastAPI, File, HTTPException, Depends, Body, UploadFile
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -8,7 +7,6 @@ from fastapi.staticfiles import StaticFiles
 from models.api import (
     DeleteRequest,
     DeleteResponse,
-    IndexRequest,
     QueryRequest,
     QueryResponse,
     UpsertRequest,
@@ -43,23 +41,7 @@ def validate_token(credentials: HTTPAuthorizationCredentials = Depends(bearer_sc
 
 
 @app.post(
-    "/create-index",
-    status_code=201,
-)
-async def create_index(
-    request: IndexRequest = Body(...),
-    token: HTTPAuthorizationCredentials = Depends(validate_token),
-):
-    datastore = await get_datastore(request.name)
-    try:
-        await datastore.create_index()
-    except Exception as e:
-        print("Error:", e)
-        raise HTTPException(status_code=500, detail=f"str({e})")
-
-
-@app.post(
-    "/upsert-file",
+    "/upsert-file/{author}",
     response_model=UpsertResponse,
 )
 async def upsert_file(
@@ -74,7 +56,7 @@ async def upsert_file(
         file=file,
         metadata=metadata,
     )
-    datastore = get_datastore()
+
     try:
         ids = await datastore.upsert([document])
         return UpsertResponse(ids=ids)
@@ -91,7 +73,6 @@ async def upsert(
     request: UpsertRequest = Body(...),
     token: HTTPAuthorizationCredentials = Depends(validate_token),
 ):
-    datastore = get_datastore()
     try:
         ids = await datastore.upsert(request.documents)
         return UpsertResponse(ids=ids)
@@ -108,7 +89,6 @@ async def query_main(
     request: QueryRequest = Body(...),
     token: HTTPAuthorizationCredentials = Depends(validate_token),
 ):
-    datastore = get_datastore()
     try:
         results = await datastore.query(
             request.queries,
@@ -129,7 +109,6 @@ async def query(
     request: QueryRequest = Body(...),
     token: HTTPAuthorizationCredentials = Depends(validate_token),
 ):
-    datastore = get_datastore()
     try:
         results = await datastore.query(
             request.queries,
@@ -153,7 +132,6 @@ async def delete(
             status_code=400,
             detail="One of ids, filter, or delete_all is required",
         )
-    datastore = get_datastore()
     try:
         success = await datastore.delete(
             ids=request.ids,
@@ -164,6 +142,12 @@ async def delete(
     except Exception as e:
         print("Error:", e)
         raise HTTPException(status_code=500, detail="Internal Service Error")
+
+
+@app.on_event("startup")
+async def startup():
+    global datastore
+    datastore = await get_datastore()
 
 
 def start():

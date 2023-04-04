@@ -15,12 +15,6 @@ from services.openai import get_embeddings
 
 
 class DataStore(ABC):
-    async def create_index(self) -> None:
-        """
-        Creates an index in the database.
-        """
-        await self._create_index()
-
     async def upsert(
         self, documents: List[Document], chunk_token_size: Optional[int] = None
     ) -> List[str]:

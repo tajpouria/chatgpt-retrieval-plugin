@@ -19,8 +19,10 @@ from services.date import to_unix_timestamp
 # Read environment variables for Pinecone configuration
 PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY")
 PINECONE_ENVIRONMENT = os.environ.get("PINECONE_ENVIRONMENT")
+PINECONE_INDEX = os.environ.get("PINECONE_INDEX")
 assert PINECONE_API_KEY is not None
 assert PINECONE_ENVIRONMENT is not None
+assert PINECONE_INDEX is not None
 
 # Initialize Pinecone with the API key and environment
 pinecone.init(api_key=PINECONE_API_KEY, environment=PINECONE_ENVIRONMENT)
@@ -30,34 +32,36 @@ UPSERT_BATCH_SIZE = 100
 
 
 class PineconeDataStore(DataStore):
-    def __init__(self, index_name):
-        self.index_name = index_name
-        self.index = pinecone.Index(index_name)
+    def __init__(self):
+        # Check if the index name is specified and exists in Pinecone
+        if PINECONE_INDEX and PINECONE_INDEX not in pinecone.list_indexes():
+            # Get all fields in the metadata object in a list
+            fields_to_index = list(DocumentChunkMetadata.__fields__.keys())
 
-    @retry(wait=wait_random_exponential(min=1, max=20), stop=stop_after_attempt(3))
-    async def _create_index(
-        self,
-        dimension: int = 1536,
-        metadata_config: Dict[str, Any] = {
-            "indexed": list(DocumentChunkMetadata.__fields__.keys())
-        },
-    ):
-        """
-        Create a new Pinecone index with the specified name, dimension, and metadata configuration
-        """
-        try:
-            print(
-                f"Creating index {self.index_name} with metadata config {metadata_config}"
-            )
-            pinecone.create_index(
-                self.index_name,
-                dimension=dimension,  # dimensionality of OpenAI ada v2 embeddings
-                metadata_config=metadata_config,
-            )
-            print(f"Index {self.index_name} created successfully")
-        except Exception as e:
-            print(f"Error creating index {self.index_name}: {e}")
-            raise e
+            # Create a new index with the specified name, dimension, and metadata configuration
+            try:
+                print(
+                    f"Creating index {PINECONE_INDEX} with metadata config {fields_to_index}"
+                )
+                pinecone.create_index(
+                    PINECONE_INDEX,
+                    dimension=1536,  # dimensionality of OpenAI ada v2 embeddings
+                    metadata_config={"indexed": fields_to_index},
+                )
+                self.index = pinecone.Index(PINECONE_INDEX)
+                print(f"Index {PINECONE_INDEX} created successfully")
+            except Exception as e:
+                print(f"Error creating index {PINECONE_INDEX}: {e}")
+                raise e
+        elif PINECONE_INDEX and PINECONE_INDEX in pinecone.list_indexes():
+            # Connect to an existing index with the specified name
+            try:
+                print(f"Connecting to existing index {PINECONE_INDEX}")
+                self.index = pinecone.Index(PINECONE_INDEX)
+                print(f"Connected to index {PINECONE_INDEX} successfully")
+            except Exception as e:
+                print(f"Error connecting to index {PINECONE_INDEX}: {e}")
+                raise e
 
     @retry(wait=wait_random_exponential(min=1, max=20), stop=stop_after_attempt(3))
     async def _upsert(self, chunks: Dict[str, List[DocumentChunk]]) -> List[str]:
