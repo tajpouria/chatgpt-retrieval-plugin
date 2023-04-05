@@ -16,7 +16,10 @@ from services.openai import get_embeddings
 
 class DataStore(ABC):
     async def upsert(
-        self, documents: List[Document], chunk_token_size: Optional[int] = None
+        self,
+        documents: List[Document],
+        chunk_token_size: Optional[int] = None,
+        namespace: Optional[str] = None,
     ) -> List[str]:
         """
         Takes in a list of documents and inserts them into the database.
@@ -30,6 +33,7 @@ class DataStore(ABC):
                     filter=DocumentMetadataFilter(
                         document_id=document.id,
                     ),
+                    namespace=namespace,
                     delete_all=False,
                 )
                 for document in documents
@@ -39,10 +43,14 @@ class DataStore(ABC):
 
         chunks = get_document_chunks(documents, chunk_token_size)
 
-        return await self._upsert(chunks)
+        return await self._upsert(chunks, namespace=namespace)
 
     @abstractmethod
-    async def _upsert(self, chunks: Dict[str, List[DocumentChunk]]) -> List[str]:
+    async def _upsert(
+        self,
+        chunks: Dict[str, List[DocumentChunk]],
+        namespace: Optional[str] = None,
+    ) -> List[str]:
         """
         Takes in a list of list of document chunks and inserts them into the database.
         Return a list of document ids.
@@ -50,7 +58,10 @@ class DataStore(ABC):
 
         raise NotImplementedError
 
-    async def query(self, queries: List[Query]) -> List[QueryResult]:
+    async def query(
+        self,
+        queries: List[Query],
+    ) -> List[QueryResult]:
         """
         Takes in a list of queries and filters and returns a list of query results with matching document chunks and scores.
         """
@@ -65,7 +76,10 @@ class DataStore(ABC):
         return await self._query(queries_with_embeddings)
 
     @abstractmethod
-    async def _query(self, queries: List[QueryWithEmbedding]) -> List[QueryResult]:
+    async def _query(
+        self,
+        queries: List[QueryWithEmbedding],
+    ) -> List[QueryResult]:
         """
         Takes in a list of queries with embeddings and filters and returns a list of query results with matching document chunks and scores.
         """
@@ -77,6 +91,7 @@ class DataStore(ABC):
         ids: Optional[List[str]] = None,
         filter: Optional[DocumentMetadataFilter] = None,
         delete_all: Optional[bool] = None,
+        namespace: Optional[str] = None,
     ) -> bool:
         """
         Removes vectors by ids, filter, or everything in the datastore.

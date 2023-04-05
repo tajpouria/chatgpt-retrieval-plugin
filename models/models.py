@@ -4,14 +4,10 @@ from enum import Enum
 
 
 class Source(str, Enum):
-    email = "email"
-    file = "file"
-    chat = "chat"
+    google_docs = "google_docs"
 
 
 class DocumentMetadata(BaseModel):
-    account_id: Optional[int] = None
-    agentbot_id: Optional[int] = None
     source: Optional[Source] = None
     source_id: Optional[str] = None
     url: Optional[str] = None
@@ -45,8 +41,6 @@ class DocumentWithChunks(Document):
 
 
 class DocumentMetadataFilter(BaseModel):
-    account_id: Optional[int] = None
-    agentbot_id: Optional[int] = None
     document_id: Optional[str] = None
     source: Optional[Source] = None
     source_id: Optional[str] = None
@@ -64,6 +58,7 @@ class Query(BaseModel):
 
 class QueryWithEmbedding(Query):
     embedding: List[float]
+    namespace: Optional[str] = None
 
 
 class QueryResult(BaseModel):

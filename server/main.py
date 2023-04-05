@@ -3,12 +3,10 @@ from pydantic import ValidationError
 import uvicorn
 from fastapi import (
     FastAPI,
-    File,
     Form,
     HTTPException,
     Depends,
     Body,
-    UploadFile,
     status,
 )
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -24,7 +22,7 @@ from models.api import (
     UpsertResponse,
 )
 from models.models import DocumentMetadata
-from datastore.factory import datastore
+from datastore.factory import datastore, get_namespace_name
 from services.file import get_document_from_file
 from bot.router import router_v1
 
@@ -65,44 +63,18 @@ def upsert_file_metadata_parser(metadata: str = Form(...)):
 
 
 @app.post(
-    "/upsert-file",
-    response_model=UpsertResponse,
-)
-async def upsert_file(
-    metadata: DocumentMetadata = Depends(upsert_file_metadata_parser),
-    file: UploadFile = File(...),
-    token: HTTPAuthorizationCredentials = Depends(validate_token),
-):
-    """Upload a file and metadata to the datastore.
-
-    Args:
-        metadata (DocumentMetadata): The metadata for the file.
-        file (UploadFile): The file to upload.
-        token (HTTPAuthorizationCredentials): The token to authenticate the request.
-
-    Returns:
-        UpsertResponse: The response containing the ids of the documents that were upserted.
-    """
-    document = await get_document_from_file(file=file, metadata=metadata)
-
-    try:
-        ids = await datastore.upsert([document])
-        return UpsertResponse(ids=ids)
-    except Exception as e:
-        print("Error:", e)
-        raise HTTPException(status_code=500, detail=f"str({e})")
-
-
-@app.post(
-    "/upsert",
+    "/api/v1/docs/{account_id}/{agentbot_id}/upsert",
     response_model=UpsertResponse,
 )
 async def upsert(
+    account_id: str,
+    agentbot_id: str,
     request: UpsertRequest = Body(...),
     token: HTTPAuthorizationCredentials = Depends(validate_token),
 ):
     try:
-        ids = await datastore.upsert(request.documents)
+        namespace = get_namespace_name(account_id=account_id, agentbot_id=agentbot_id)
+        ids = await datastore.upsert(request.documents, namespace=namespace)
         return UpsertResponse(ids=ids)
     except Exception as e:
         print("Error:", e)
@@ -148,10 +120,12 @@ async def query(
 
 
 @app.delete(
-    "/delete",
+    "/api/v1/docs/{account_id}/{agentbot_id}/delete",
     response_model=DeleteResponse,
 )
 async def delete(
+    account_id: str,
+    agentbot_id: str,
     request: DeleteRequest = Body(...),
     token: HTTPAuthorizationCredentials = Depends(validate_token),
 ):
@@ -160,11 +134,13 @@ async def delete(
             status_code=400,
             detail="One of ids, filter, or delete_all is required",
         )
+    namespace = get_namespace_name(account_id=account_id, agentbot_id=agentbot_id)
     try:
         success = await datastore.delete(
             ids=request.ids,
             filter=request.filter,
             delete_all=request.delete_all,
+            namespace=namespace,
         )
         return DeleteResponse(success=success)
     except Exception as e:

@@ -64,7 +64,9 @@ class PineconeDataStore(DataStore):
                 raise e
 
     @retry(wait=wait_random_exponential(min=1, max=20), stop=stop_after_attempt(3))
-    async def _upsert(self, chunks: Dict[str, List[DocumentChunk]]) -> List[str]:
+    async def _upsert(
+        self, chunks: Dict[str, List[DocumentChunk]], namespace: Optional[str] = None
+    ) -> List[str]:
         """
         Takes in a dict from document id to list of document chunks and inserts them into the index.
         Return a list of document ids.
@@ -95,16 +97,11 @@ class PineconeDataStore(DataStore):
         ]
         # Upsert each batch to Pinecone
         for batch in batches:
-            namespace = batch[0][2]["namespace"] if "namespace" in batch[0][2] else None
             try:
                 print(
                     f"Upserting batch of size {len(batch)} to namespace {namespace if namespace else 'default'}"
                 )
-                self.index.upsert(
-                    vectors=batch
-                ) if namespace == None else self.index.upsert(
-                    vectors=batch, namespace=namespace
-                )
+                self.index.upsert(vectors=batch, namespace=namespace)
                 print(f"Upserted batch successfully")
             except Exception as e:
                 print(f"Error upserting batch: {e}")
@@ -183,15 +180,18 @@ class PineconeDataStore(DataStore):
         ids: Optional[List[str]] = None,
         filter: Optional[DocumentMetadataFilter] = None,
         delete_all: Optional[bool] = None,
+        namespace: Optional[str] = None,
     ) -> bool:
         """
         Removes vectors by ids, filter, or everything from the index.
         """
         # Delete all vectors from the index if delete_all is True
+
+        namespace_text = namespace if namespace else "default"
         if delete_all == True:
             try:
-                print(f"Deleting all vectors from index")
-                self.index.delete(delete_all=True)
+                print(f"Deleting all vectors from namespace {namespace_text}")
+                self.index.delete(delete_all=True, namespace=namespace)
                 print(f"Deleted all vectors successfully")
                 return True
             except Exception as e:
@@ -203,8 +203,10 @@ class PineconeDataStore(DataStore):
         # Delete vectors that match the filter from the index if the filter is not empty
         if pinecone_filter != {}:
             try:
-                print(f"Deleting vectors with filter {pinecone_filter}")
-                self.index.delete(filter=pinecone_filter)
+                print(
+                    f"Deleting vectors with filter {pinecone_filter} from namespace {namespace_text}"
+                )
+                self.index.delete(filter=pinecone_filter, namespace=namespace)
                 print(f"Deleted vectors with filter successfully")
             except Exception as e:
                 print(f"Error deleting vectors with filter: {e}")
@@ -213,9 +215,11 @@ class PineconeDataStore(DataStore):
         # Delete vectors that match the document ids from the index if the ids list is not empty
         if ids != None and len(ids) > 0:
             try:
-                print(f"Deleting vectors with ids {ids}")
+                print(
+                    f"Deleting vectors with ids {ids} from namespace {namespace_text}"
+                )
                 pinecone_filter = {"document_id": {"$in": ids}}
-                self.index.delete(filter=pinecone_filter)  # type: ignore
+                self.index.delete(filter=pinecone_filter, namespace=namespace)  # type: ignore
                 print(f"Deleted vectors with ids successfully")
             except Exception as e:
                 print(f"Error deleting vectors with ids: {e}")
