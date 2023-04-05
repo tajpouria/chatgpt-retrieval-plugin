@@ -9,15 +9,19 @@ from services.translate import translate_text
 from services.query_parser import concatenate_query_results
 from dict_deep import deep_get
 from datastore.factory import datastore, get_namespace_name
-from prompts.bot_conversation import prompt as bot_conversation_prompt
-from agents.llm import llm
+from prompts.qa import prompt as qa_prompt
 from models.models import Query
+from langchain.memory.chat_message_histories import RedisChatMessageHistory
+from langchain.memory import ConversationBufferMemory
+from langchain import OpenAI, LLMChain
 
 CHATWOOT_URL = os.getenv("CHATWOOT_URL")
 CHATWOOT_BOT_TOKEN = os.getenv("CHATWOOT_BOT_TOKEN")
 CHATWOOT_PLATFORM_TOKEN = os.getenv("CHATWOOT_PLATFORM_TOKEN")
 CHATWOOT_USER_TOKEN = os.getenv("CHATWOOT_USER_TOKEN")
 CHATWOOT_AGENTBOT_OUTGOING_URL = os.getenv("CHATWOOT_AGENTBOT_OUTGOING_URL")
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+CONVERSATION_HISTORY_TTL = int(os.getenv("CONVERSATION_HISTORY_TTL", 60 * 60 * 24 * 3))
 
 agentbot_description = "Fly With Bot is an AI-powered chatbot designed to assist customers with information on Fly With Pouria, an online travel business offering ticket selling, car renting, and hotel renting services. Available 24/7, Fly With Bot provides customers with up-to-date and accurate information on Fly With Pouria's products and services, including pricing and availability. Customers can also receive recommendations based on their preferences and previous booking history, and Fly With Bot can even assist with last-minute changes or cancellations. With its natural language processing capabilities and user-friendly interface, Fly With Bot is the perfect travel companion for anyone looking to book travel services with Fly With Pouria."
 
@@ -68,9 +72,9 @@ async def handle_text_content(
         event_data.get("content"),
     )
 
-    content = deep_get(event_data, "content")
-    account_id = deep_get(event_data, "account.id")
-    conversation_id = deep_get(event_data, "conversation.id")
+    content: str = deep_get(event_data, "content")
+    account_id: int = deep_get(event_data, "account.id")
+    conversation_id: int = deep_get(event_data, "conversation.id")
 
     if not content or not account_id or not conversation_id:
         logger.error(
@@ -85,6 +89,10 @@ async def handle_text_content(
         chatwoot_platform_token=CHATWOOT_PLATFORM_TOKEN,
         chatwoot_user_token=CHATWOOT_USER_TOKEN,
         chatwoot_account_id=account_id,
+    )
+
+    chat_history = RedisChatMessageHistory(
+        session_id=str(conversation_id), url=REDIS_URL, ttl=CONVERSATION_HISTORY_TTL
     )
 
     # Get the translated query
@@ -137,17 +145,20 @@ async def handle_text_content(
         return
 
     # Get the LLM response
-    # TODO: Make and keep user conversation in outsource memory for a week
-    # TODO: Must be rewritten with langchain conversation flow
     try:
-        prompt = bot_conversation_prompt.format(
-            agentbot_description=agentbot_description,
-            common_query_results="",
-            account_query_results=query_results.get("account", ""),
-            content_language=content_language,
-            conversation=content,
+        memory = ConversationBufferMemory(input_key="content", chat_memory=chat_history)
+        chain = LLMChain(
+            llm=OpenAI(temperature=0),
+            prompt=qa_prompt,
+            memory=memory,
+            verbose=True,
         )
-        ai_content = llm(prompt)
+        ai_content = chain.predict(
+            agentbot_description=agentbot_description,
+            context=query_results.get("account"),
+            content_language=content_language,
+            content=content,
+        )
     except Exception as e:
         logger.error("Error generating the response: %s", e)
         response = send_message_to_conversation(
